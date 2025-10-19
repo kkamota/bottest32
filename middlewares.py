@@ -1,9 +1,11 @@
 import asyncio
+import logging
 from collections import defaultdict
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional
 
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject
+from flyerapi import APIError, Flyer
 
 
 class ThrottlingMiddleware(BaseMiddleware):
@@ -29,6 +31,46 @@ class ThrottlingMiddleware(BaseMiddleware):
             if now - last_time < self.rate_limit:
                 return
             self._user_timestamps[user.id] = now
+        return await handler(event, data)
+
+
+class FlyerCheckMiddleware(BaseMiddleware):
+    def __init__(self, flyer: Flyer, *, message_template: Optional[Dict[str, str]] = None) -> None:
+        super().__init__()
+        self.flyer = flyer
+        self._message_template = message_template or {
+            "text": "Чтобы продолжить работу с ботом, выполните задания ниже.",
+        }
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, Dict[str, Any]], Any],
+        event: TelegramObject,
+        data: Dict[str, Any],
+    ) -> Any:
+        user = data.get("event_from_user")
+        if user is None:
+            return await handler(event, data)
+
+        language_code = getattr(user, "language_code", None)
+        message_payload = dict(self._message_template)
+
+        try:
+            is_allowed = await self.flyer.check(
+                user.id,
+                language_code=language_code,
+                message=message_payload,
+            )
+        except APIError:
+            logging.exception("Flyer API returned an error during check")
+            return await handler(event, data)
+        except Exception:
+            logging.exception("Unexpected error during Flyer verification")
+            return await handler(event, data)
+
+        if not is_allowed:
+            return None
+
         return await handler(event, data)
 
 

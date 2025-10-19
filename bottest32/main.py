@@ -5,10 +5,12 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
+from flyerapi import Flyer
+
 from .config import Settings, load_settings
 from .database import db
 from .handlers import register_handlers
-from .middlewares import ThrottlingMiddleware
+from .middlewares import FlyerCheckMiddleware, ThrottlingMiddleware
 
 
 async def on_startup(bot: Bot) -> None:
@@ -25,9 +27,13 @@ async def main() -> None:
         token=settings.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
-    dp = Dispatcher()
-    dp.workflow_data.update(settings=settings)
+    flyer = Flyer(settings.flyer_api_key)
 
+    dp = Dispatcher()
+    dp.workflow_data.update(settings=settings, flyer=flyer)
+
+    dp.message.middleware(FlyerCheckMiddleware(flyer))
+    dp.callback_query.middleware(FlyerCheckMiddleware(flyer))
     dp.message.middleware(ThrottlingMiddleware(rate_limit=0.5))
 
     register_handlers(dp)

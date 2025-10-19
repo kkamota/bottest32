@@ -16,7 +16,7 @@ class Settings:
 
 
 def load_settings() -> Settings:
-    token = os.getenv("BOT_TOKEN", "")
+    token = os.getenv("BOT_TOKEN", "8413197852:AAGnWgpALWsFVuXdAGaa9zi5XC3BRK-Ykuw")
     channel = os.getenv("CHANNEL_USERNAME", "@giftsauctionsru")
     raw_admins = os.getenv("ADMIN_IDS", "5838432507")
     admin_ids = tuple(
